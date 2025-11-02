@@ -1,6 +1,6 @@
 // backend/server.ts
-// FIX: Import Request and Response types directly from express to resolve type conflicts.
-import express, { Request, Response } from 'express';
+// FIX: Changed express import to default import to resolve type conflicts with global Request/Response types.
+import express from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
 import fetch, { RequestInit } from 'node-fetch';
@@ -8,8 +8,8 @@ import 'dotenv/config';
 
 const app = express();
 app.use(cors({ origin: 'http://localhost:3000' }));
-// FIX: Pass an empty options object to express.json() to help with TypeScript overload resolution.
-app.use(express.json({}));
+// FIX: Reverted to standard express.json() call. The type import change should resolve the overload issue.
+app.use(express.json());
 
 const PORT = process.env.PORT || 8080;
 const APP_KEY = process.env.APP_KEY;
@@ -39,7 +39,8 @@ const signRequest = (path: string, params: Record<string, any>, secret: string):
 
 // --- AUTHENTICATION FLOW ---
 
-app.get('/api/auth/initiate', (req: Request, res: Response) => {
+// FIX: Use express.Request and express.Response to avoid type conflicts.
+app.get('/api/auth/initiate', (req: express.Request, res: express.Response) => {
     if (!APP_KEY) {
         return res.status(500).send("App Key is not configured on the backend.");
     }
@@ -55,7 +56,8 @@ app.get('/api/auth/initiate', (req: Request, res: Response) => {
     res.redirect(`${AUTH_URL}?${params.toString()}`);
 });
 
-app.get('/api/auth/callback', async (req: Request, res: Response) => {
+// FIX: Use express.Request and express.Response to avoid type conflicts.
+app.get('/api/auth/callback', async (req: express.Request, res: express.Response) => {
     const { code } = req.query;
 
     if (!code || typeof code !== 'string') {
@@ -185,13 +187,15 @@ const performSignedRequest = async (path: string, accountId: string, extraParams
 };
 
 
-app.get('/api/accounts', (req: Request, res: Response) => {
+// FIX: Use express.Request and express.Response to avoid type conflicts.
+app.get('/api/accounts', (req: express.Request, res: express.Response) => {
     // Return public-safe account info, excluding tokens
     const publicAccounts = Object.values(accounts).map(({ id, name, logoUrl }) => ({ id, name, logoUrl }));
     res.json(publicAccounts);
 });
 
-app.post('/api/accounts/disconnect', (req: Request, res: Response) => {
+// FIX: Use express.Request and express.Response to avoid type conflicts.
+app.post('/api/accounts/disconnect', (req: express.Request, res: express.Response) => {
     const { accountId } = req.body;
     if (accounts[accountId]) {
         delete accounts[accountId];
@@ -201,7 +205,8 @@ app.post('/api/accounts/disconnect', (req: Request, res: Response) => {
     }
 });
 
-app.get('/api/orders', async (req: Request, res: Response) => {
+// FIX: Use express.Request and express.Response to avoid type conflicts.
+app.get('/api/orders', async (req: express.Request, res: express.Response) => {
     try {
         let allOrders: any[] = [];
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -224,7 +229,8 @@ app.get('/api/orders', async (req: Request, res: Response) => {
     }
 });
 
-app.get('/api/financials', async (req: Request, res: Response) => {
+// FIX: Use express.Request and express.Response to avoid type conflicts.
+app.get('/api/financials', async (req: express.Request, res: express.Response) => {
      try {
         let allFinancials: any[] = [];
         for (const accountId in accounts) {
@@ -243,7 +249,8 @@ app.get('/api/financials', async (req: Request, res: Response) => {
     }
 });
 
-app.post('/api/pack', async (req: Request, res: Response) => {
+// FIX: Use express.Request and express.Response to avoid type conflicts.
+app.post('/api/pack', async (req: express.Request, res: express.Response) => {
     try {
         const { orderItemIds, accountId } = req.body;
         if (!orderItemIds || !accountId) {
