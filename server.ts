@@ -1,9 +1,9 @@
 // backend/server.ts
-// FIX: Explicitly use express.Request and express.Response types to avoid conflicts with global types.
-import express from 'express';
+// FIX: Import Request and Response types directly from express to resolve type conflicts.
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
-import fetch from 'node-fetch';
+import fetch, { RequestInit } from 'node-fetch';
 import 'dotenv/config';
 
 const app = express();
@@ -39,8 +39,7 @@ const signRequest = (path: string, params: Record<string, any>, secret: string):
 
 // --- AUTHENTICATION FLOW ---
 
-// FIX: Use express.Request and express.Response types to avoid ambiguity with global types.
-app.get('/api/auth/initiate', (req: express.Request, res: express.Response) => {
+app.get('/api/auth/initiate', (req: Request, res: Response) => {
     if (!APP_KEY) {
         return res.status(500).send("App Key is not configured on the backend.");
     }
@@ -56,8 +55,7 @@ app.get('/api/auth/initiate', (req: express.Request, res: express.Response) => {
     res.redirect(`${AUTH_URL}?${params.toString()}`);
 });
 
-// FIX: Use express.Request and express.Response types to avoid ambiguity with global types.
-app.get('/api/auth/callback', async (req: express.Request, res: express.Response) => {
+app.get('/api/auth/callback', async (req: Request, res: Response) => {
     const { code } = req.query;
 
     if (!code || typeof code !== 'string') {
@@ -124,47 +122,76 @@ app.get('/api/auth/callback', async (req: express.Request, res: express.Response
 
 // --- API PROXY ENDPOINTS ---
 
-const performSignedRequest = async (path: string, accountId: string, extraParams: Record<string, any> = {}, method = 'GET') => {
+const performSignedRequest = async (path: string, accountId: string, extraParams: Record<string, any> = {}, method: 'GET' | 'POST' = 'GET') => {
     const account = accounts[accountId];
     if (!account || !account.accessToken) {
         throw new Error(`No valid token for account ${accountId}`);
     }
 
-    // TODO: Add logic here to use refresh_token if access_token is expired.
+    // TODO: Add token refresh logic if access_token is expired.
 
     const commonParams = {
-        app_key: APP_KEY,
+        app_key: APP_KEY!,
         access_token: account.accessToken,
         sign_method: 'sha256',
         timestamp: `${Date.now()}`,
     };
     
-    const allParams = { ...commonParams, ...extraParams };
-    const signature = signRequest(path, allParams, APP_SECRET!);
+    // All params (common/protocol + business/extra) are used for signing
+    const allParamsForSigning = { ...commonParams, ...extraParams };
+    const signature = signRequest(path, allParamsForSigning, APP_SECRET!);
+    
+    let url: string;
+    const options: RequestInit = { method };
 
-    const queryParams = new URLSearchParams({ ...allParams, sign: signature });
-    const url = `${API_BASE_URL}${path}?${queryParams.toString()}`;
+    // Common/protocol params and the signature go in the query string for BOTH GET and POST
+    const queryParams = new URLSearchParams({ ...commonParams, sign: signature });
 
-    const response = await fetch(url, { method });
-    // FIX: Cast the JSON response to the defined interface to fix property access errors on 'unknown'.
+    if (method === 'POST') {
+        url = `${API_BASE_URL}${path}?${queryParams.toString()}`;
+        
+        // Business/extra params go in the body for POST requests
+        const bodyParams = new URLSearchParams();
+        for (const key in extraParams) {
+            bodyParams.append(key, extraParams[key]);
+        }
+        options.body = bodyParams;
+        options.headers = { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' };
+
+    } else { // GET
+        // Business/extra params also go in the query string for GET requests
+        for (const key in extraParams) {
+            queryParams.append(key, extraParams[key]);
+        }
+        url = `${API_BASE_URL}${path}?${queryParams.toString()}`;
+    }
+    
+    const response = await fetch(url, options);
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Daraz API HTTP Error ${response.status} for ${method} ${path}:`, errorText);
+        throw new Error(`Daraz API request failed with status ${response.status}`);
+    }
+
     const result = await response.json() as DarazResponse;
 
     if (result.code !== '0') {
-        throw new Error(`Daraz API Error: ${result.message}`);
+        console.error("Daraz API Logic Error:", result);
+        throw new Error(`Daraz API Error: ${result.message || 'Unknown error from Daraz API'}`);
     }
 
     return result.data;
 };
 
-// FIX: Use express.Request and express.Response types to avoid ambiguity with global types.
-app.get('/api/accounts', (req: express.Request, res: express.Response) => {
+
+app.get('/api/accounts', (req: Request, res: Response) => {
     // Return public-safe account info, excluding tokens
     const publicAccounts = Object.values(accounts).map(({ id, name, logoUrl }) => ({ id, name, logoUrl }));
     res.json(publicAccounts);
 });
 
-// FIX: Use express.Request and express.Response types to avoid ambiguity with global types.
-app.post('/api/accounts/disconnect', (req: express.Request, res: express.Response) => {
+app.post('/api/accounts/disconnect', (req: Request, res: Response) => {
     const { accountId } = req.body;
     if (accounts[accountId]) {
         delete accounts[accountId];
@@ -174,8 +201,7 @@ app.post('/api/accounts/disconnect', (req: express.Request, res: express.Respons
     }
 });
 
-// FIX: Use express.Request and express.Response types to avoid ambiguity with global types.
-app.get('/api/orders', async (req: express.Request, res: express.Response) => {
+app.get('/api/orders', async (req: Request, res: Response) => {
     try {
         let allOrders: any[] = [];
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -198,8 +224,7 @@ app.get('/api/orders', async (req: express.Request, res: express.Response) => {
     }
 });
 
-// FIX: Use express.Request and express.Response types to avoid ambiguity with global types.
-app.get('/api/financials', async (req: express.Request, res: express.Response) => {
+app.get('/api/financials', async (req: Request, res: Response) => {
      try {
         let allFinancials: any[] = [];
         for (const accountId in accounts) {
@@ -218,8 +243,7 @@ app.get('/api/financials', async (req: express.Request, res: express.Response) =
     }
 });
 
-// FIX: Use express.Request and express.Response types to avoid ambiguity with global types.
-app.post('/api/pack', async (req: express.Request, res: express.Response) => {
+app.post('/api/pack', async (req: Request, res: Response) => {
     try {
         const { orderItemIds, accountId } = req.body;
         if (!orderItemIds || !accountId) {
