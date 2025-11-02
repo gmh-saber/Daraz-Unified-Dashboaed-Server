@@ -2,7 +2,7 @@
   "name": "daraz-dashboard-backend",
   "version": "1.0.0",
   "description": "Secure backend for the Daraz Unified Dashboard",
-  "main": "server.ts",
+  "main": "dist/server.js",
   "type": "module",
   "scripts": {
     "start": "node dist/server.js",
