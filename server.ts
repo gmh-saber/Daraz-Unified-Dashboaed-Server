@@ -1,6 +1,6 @@
 // backend/server.ts
-// FIX: Changed express import to default import to resolve type conflicts with global Request/Response types.
-import express from 'express';
+// FIX: Import Request and Response types directly from express to resolve type conflicts.
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
 import fetch, { RequestInit } from 'node-fetch';
@@ -8,7 +8,7 @@ import 'dotenv/config';
 
 const app = express();
 app.use(cors({ origin: 'http://localhost:3000' }));
-// FIX: Reverted to standard express.json() call. The type import change should resolve the overload issue.
+// FIX: This should now be correctly typed due to the express import fix.
 app.use(express.json());
 
 const PORT = process.env.PORT || 8080;
@@ -39,8 +39,8 @@ const signRequest = (path: string, params: Record<string, any>, secret: string):
 
 // --- AUTHENTICATION FLOW ---
 
-// FIX: Use express.Request and express.Response to avoid type conflicts.
-app.get('/api/auth/initiate', (req: express.Request, res: express.Response) => {
+// FIX: Use Request and Response types imported from express.
+app.get('/api/auth/initiate', (req: Request, res: Response) => {
     if (!APP_KEY) {
         return res.status(500).send("App Key is not configured on the backend.");
     }
@@ -56,8 +56,8 @@ app.get('/api/auth/initiate', (req: express.Request, res: express.Response) => {
     res.redirect(`${AUTH_URL}?${params.toString()}`);
 });
 
-// FIX: Use express.Request and express.Response to avoid type conflicts.
-app.get('/api/auth/callback', async (req: express.Request, res: express.Response) => {
+// FIX: Use Request and Response types imported from express.
+app.get('/api/auth/callback', async (req: Request, res: Response) => {
     const { code } = req.query;
 
     if (!code || typeof code !== 'string') {
@@ -187,15 +187,15 @@ const performSignedRequest = async (path: string, accountId: string, extraParams
 };
 
 
-// FIX: Use express.Request and express.Response to avoid type conflicts.
-app.get('/api/accounts', (req: express.Request, res: express.Response) => {
+// FIX: Use Request and Response types imported from express.
+app.get('/api/accounts', (req: Request, res: Response) => {
     // Return public-safe account info, excluding tokens
     const publicAccounts = Object.values(accounts).map(({ id, name, logoUrl }) => ({ id, name, logoUrl }));
     res.json(publicAccounts);
 });
 
-// FIX: Use express.Request and express.Response to avoid type conflicts.
-app.post('/api/accounts/disconnect', (req: express.Request, res: express.Response) => {
+// FIX: Use Request and Response types imported from express.
+app.post('/api/accounts/disconnect', (req: Request, res: Response) => {
     const { accountId } = req.body;
     if (accounts[accountId]) {
         delete accounts[accountId];
@@ -205,8 +205,8 @@ app.post('/api/accounts/disconnect', (req: express.Request, res: express.Respons
     }
 });
 
-// FIX: Use express.Request and express.Response to avoid type conflicts.
-app.get('/api/orders', async (req: express.Request, res: express.Response) => {
+// FIX: Use Request and Response types imported from express.
+app.get('/api/orders', async (req: Request, res: Response) => {
     try {
         let allOrders: any[] = [];
         const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -229,8 +229,8 @@ app.get('/api/orders', async (req: express.Request, res: express.Response) => {
     }
 });
 
-// FIX: Use express.Request and express.Response to avoid type conflicts.
-app.get('/api/financials', async (req: express.Request, res: express.Response) => {
+// FIX: Use Request and Response types imported from express.
+app.get('/api/financials', async (req: Request, res: Response) => {
      try {
         let allFinancials: any[] = [];
         for (const accountId in accounts) {
@@ -249,8 +249,8 @@ app.get('/api/financials', async (req: express.Request, res: express.Response) =
     }
 });
 
-// FIX: Use express.Request and express.Response to avoid type conflicts.
-app.post('/api/pack', async (req: express.Request, res: express.Response) => {
+// FIX: Use Request and Response types imported from express.
+app.post('/api/pack', async (req: Request, res: Response) => {
     try {
         const { orderItemIds, accountId } = req.body;
         if (!orderItemIds || !accountId) {
